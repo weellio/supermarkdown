@@ -1,0 +1,213 @@
+<!doctype html>
+<!--
+  Super Markdown {{VERSION}} ({{BUILD}} build) - a single-file, offline Markdown reader.
+  Drop a .md file (or a whole folder) onto this page. Nothing is uploaded; nothing is installed.
+
+  Bundled third-party software (all inlined below, unmodified apart from HTML-safe escaping):
+    marked (MIT) - marked-footnote (MIT) - DOMPurify (Apache-2.0 / MPL-2.0) - highlight.js (BSD-3-Clause)
+    {{LAZY_CREDITS}}
+    Atkinson Hyperlegible font (SIL OFL 1.1) - JetBrains Mono font (SIL OFL 1.1)
+-->
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src * data: blob:; media-src * data: blob:; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="color-scheme" content="light dark">
+<title>Super Markdown</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232563eb'/%3E%3Cpath d='M6 22V10h3l3 4 3-4h3v12h-3v-7l-3 4-3-4v7zm17 0-4-5h3v-7h2v7h3z' fill='white'/%3E%3C/svg%3E">
+<style id="app-css">
+{{CSS}}
+</style>
+</head>
+<body>
+<div id="progress" aria-hidden="true"></div>
+
+<header class="topbar">
+  <button class="icon-btn" data-act="sidebar" data-icon="sidebar" title="Show / hide the sidebar  ( [ )" aria-label="Toggle sidebar"></button>
+  <div class="brand" data-act="home" title="Back to the start page"><span class="logo">M<b>&darr;</b></span><span class="brand-name">Super Markdown</span></div>
+  <div class="doc-title" id="doc-title"></div>
+  <span id="live-chip" class="chip live" hidden title="This file reloads by itself when it changes on disk">Live</span>
+  <div class="spacer"></div>
+  <span id="stats" class="stats"></span>
+  <button class="icon-btn" data-act="open-file" data-icon="open" title="Open a file  (Ctrl+O)" aria-label="Open file"></button>
+  <button class="icon-btn needs-doc" data-act="search" data-icon="search" title="Search this document  (Ctrl+F)" aria-label="Search"></button>
+  <button class="icon-btn" data-act="settings" data-icon="sliders" title="Reading options and themes" aria-label="Reading options"></button>
+  <button class="icon-btn" data-act="menu" data-icon="more" title="More" aria-label="More actions" aria-haspopup="menu"></button>
+</header>
+
+<div id="menu" class="menu pop" hidden role="menu">
+  <button data-act="open-file" data-icon="open">Open file&hellip;<kbd>Ctrl O</kbd></button>
+  <button data-act="open-folder" data-icon="folder">Open folder&hellip;</button>
+  <button data-act="paste" data-icon="clipboard">Paste Markdown&hellip;</button>
+  <hr>
+  <button class="needs-doc" data-act="reload" data-icon="reload">Reload from disk</button>
+  <button class="needs-doc" data-act="source" data-icon="code">Show Markdown source<kbd>V</kbd></button>
+  <button class="needs-doc" data-act="copy-md" data-icon="copy">Copy the Markdown</button>
+  <button class="needs-doc" data-act="print" data-icon="printer">Print / save as PDF<kbd>Ctrl P</kbd></button>
+  <button class="needs-doc" data-act="export" data-icon="download">Save as an HTML page</button>
+  <button class="needs-doc" data-act="close" data-icon="x">Close this document</button>
+  <hr>
+  <button data-act="sample" data-icon="book">Open the sample document</button>
+  <button data-act="help" data-icon="help">Keyboard shortcuts<kbd>?</kbd></button>
+</div>
+
+<aside id="sidebar" aria-label="Sidebar">
+  <div class="side-tabs" role="tablist">
+    <button role="tab" data-tab="outline" class="active">Outline</button>
+    <button role="tab" data-tab="files">Files <span id="files-count" class="count"></span></button>
+  </div>
+  <div class="side-pane" id="pane-outline">
+    <input id="outline-filter" class="field" type="search" placeholder="Filter headings" aria-label="Filter headings" autocomplete="off">
+    <nav id="outline" aria-label="Document outline"></nav>
+  </div>
+  <div class="side-pane" id="pane-files" hidden>
+    <nav id="filelist" aria-label="Open documents"></nav>
+    <div class="side-actions">
+      <button class="btn small" data-act="open-file">Add file</button>
+      <button class="btn small" data-act="open-folder">Add folder</button>
+    </div>
+  </div>
+</aside>
+<div id="scrim" hidden></div>
+
+<main id="main">
+  <div id="searchbar" class="pop" hidden>
+    <span class="i-wrap" data-icon="search"></span>
+    <input id="search-input" type="search" placeholder="Find in document" aria-label="Find in document" autocomplete="off">
+    <span id="search-count" class="count"></span>
+    <button class="icon-btn small" data-act="search-prev" data-icon="up" title="Previous  (Shift+Enter)" aria-label="Previous match"></button>
+    <button class="icon-btn small" data-act="search-next" data-icon="down" title="Next  (Enter)" aria-label="Next match"></button>
+    <button class="icon-btn small" data-act="search-close" data-icon="x" title="Close  (Esc)" aria-label="Close search"></button>
+  </div>
+
+  <section id="welcome">
+    <div class="drop-card">
+      <div class="drop-icon" data-icon="open"></div>
+      <h1>Drop a Markdown file anywhere</h1>
+      <p class="lead">Or pick one below. Nothing is uploaded. Everything stays on this computer.</p>
+      <div class="welcome-actions">
+        <button class="btn primary" data-act="open-file" data-icon="open">Open file</button>
+        <button class="btn" data-act="open-folder" data-icon="folder">Open folder</button>
+        <button class="btn" data-act="paste" data-icon="clipboard">Paste text</button>
+        <button class="btn" data-act="sample" data-icon="book">See a sample</button>
+      </div>
+      <p class="hint">Tip: drop a whole folder to show its images and follow links between files.</p>
+    </div>
+    <div id="recent" hidden>
+      <div class="recent-head"><h2>Recently opened</h2><button class="btn small ghost" data-act="forget">Forget all</button></div>
+      <div id="recent-list"></div>
+    </div>
+  </section>
+
+  <article id="doc" class="md" hidden></article>
+  <pre id="source" hidden></pre>
+</main>
+
+<div id="settings" class="panel pop" hidden role="dialog" aria-label="Reading options">
+  <div class="panel-head"><h2>Reading options</h2><button class="icon-btn small" data-act="settings" data-icon="x" aria-label="Close"></button></div>
+  <div class="set-group">
+    <div class="set-label">Quick presets</div>
+    <div class="seg wrap" id="presets">
+      <button data-preset="standard">Standard</button>
+      <button data-preset="comfort">Comfortable</button>
+      <button data-preset="dyslexia">Dyslexia-friendly</button>
+      <button data-preset="compact">Compact</button>
+    </div>
+  </div>
+  <div class="set-group">
+    <div class="set-label">Theme <kbd>T</kbd></div>
+    <div class="swatches" id="themes"></div>
+  </div>
+  <div class="set-group">
+    <div class="set-label">Font</div>
+    <div class="seg">
+      <button data-set="font" data-val="readable" class="f-readable">Readable</button>
+      <button data-set="font" data-val="sans" class="f-sans">Sans</button>
+      <button data-set="font" data-val="serif" class="f-serif">Serif</button>
+      <button data-set="font" data-val="mono" class="f-mono">Mono</button>
+    </div>
+  </div>
+  <label class="set-group range">
+    <span class="set-label">Text size <output data-out="size"></output></span>
+    <input type="range" data-set="size" min="13" max="30" step="1">
+  </label>
+  <label class="set-group range">
+    <span class="set-label">Line spacing <output data-out="lineHeight"></output></span>
+    <input type="range" data-set="lineHeight" min="1.3" max="2.4" step="0.05">
+  </label>
+  <label class="set-group range">
+    <span class="set-label">Letter spacing <output data-out="spacing"></output></span>
+    <input type="range" data-set="spacing" min="0" max="0.12" step="0.01">
+  </label>
+  <div class="set-group">
+    <div class="set-label">Page width</div>
+    <div class="seg">
+      <button data-set="width" data-val="narrow">Narrow</button>
+      <button data-set="width" data-val="medium">Medium</button>
+      <button data-set="width" data-val="wide">Wide</button>
+      <button data-set="width" data-val="full">Full</button>
+    </div>
+  </div>
+  <div class="set-group toggles">
+    <label class="switch"><input type="checkbox" data-set="cards"><span></span>Put each section on its own card</label>
+    <label class="switch"><input type="checkbox" data-set="ruler"><span></span>Reading ruler (follows the mouse) <kbd>R</kbd></label>
+    <label class="switch"><input type="checkbox" data-set="numbers"><span></span>Number the headings</label>
+    <label class="switch"><input type="checkbox" data-set="codeWrap"><span></span>Wrap long code lines</label>
+    <label class="switch"><input type="checkbox" data-set="breaks"><span></span>Every line break starts a new line</label>
+    <label class="switch"><input type="checkbox" data-set="math"><span></span>Render math ($x^2$)</label>
+    <label class="switch"><input type="checkbox" data-set="watch"><span></span>Reload a file by itself when it changes</label>
+    <label class="switch"><input type="checkbox" data-set="remember"><span></span>Remember open documents on this computer</label>
+  </div>
+  <div class="panel-foot">
+    <button class="btn small" data-act="reset">Reset to defaults</button>
+    <span class="muted small">Super Markdown {{VERSION}}</span>
+  </div>
+</div>
+
+<dialog id="help-dlg" class="dlg">
+  <div class="panel-head"><h2>Keyboard shortcuts</h2><button class="icon-btn small" data-act="dlg-close" data-icon="x" aria-label="Close"></button></div>
+  <table class="keys">
+    <tr><td><kbd>Ctrl</kbd> <kbd>O</kbd></td><td>Open a file</td></tr>
+    <tr><td><kbd>Ctrl</kbd> <kbd>F</kbd> or <kbd>/</kbd></td><td>Search the document</td></tr>
+    <tr><td><kbd>[</kbd></td><td>Show / hide the sidebar</td></tr>
+    <tr><td><kbd>T</kbd></td><td>Next theme</td></tr>
+    <tr><td><kbd>+</kbd> <kbd>&minus;</kbd></td><td>Bigger / smaller text</td></tr>
+    <tr><td><kbd>R</kbd></td><td>Reading ruler on / off</td></tr>
+    <tr><td><kbd>J</kbd> <kbd>K</kbd></td><td>Next / previous heading</td></tr>
+    <tr><td><kbd>,</kbd> <kbd>.</kbd></td><td>Previous / next open document</td></tr>
+    <tr><td><kbd>V</kbd></td><td>Show the Markdown source</td></tr>
+    <tr><td><kbd>Ctrl</kbd> <kbd>V</kbd></td><td>Paste Markdown to read it</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>Close whatever is open</td></tr>
+  </table>
+  <h3>What it understands</h3>
+  <p class="small">GitHub-style Markdown: tables, task lists, strikethrough, footnotes, <code>==highlights==</code>,
+  callouts (<code>&gt; [!NOTE]</code>, <code>[!TIP]</code>, <code>[!WARNING]</code>&hellip;), front matter, code highlighting for 190+ languages{{LAZY_HELP}}.
+  Raw HTML is allowed but cleaned, so scripts in a document can never run.</p>
+</dialog>
+
+<dialog id="paste-dlg" class="dlg wide">
+  <div class="panel-head"><h2>Paste Markdown</h2><button class="icon-btn small" data-act="dlg-close" data-icon="x" aria-label="Close"></button></div>
+  <textarea id="paste-text" class="field" spellcheck="false" placeholder="Paste or type Markdown here&hellip;"></textarea>
+  <div class="dlg-foot">
+    <input id="paste-name" class="field" type="text" placeholder="Name (optional)" aria-label="Document name">
+    <button class="btn primary" data-act="paste-go">Show it</button>
+  </div>
+</dialog>
+
+<div id="drop-overlay" hidden><div><div class="drop-icon" data-icon="open"></div>Drop to open</div></div>
+<div id="ruler" hidden></div>
+<div id="lightbox" hidden><img alt=""></div>
+<div id="toasts" aria-live="polite"></div>
+
+<input type="file" id="file-input" multiple hidden accept=".md,.markdown,.mdown,.mkd,.mkdn,.mdwn,.mdx,.rmd,.qmd,.txt,.text,text/markdown,text/plain,image/*">
+<input type="file" id="folder-input" webkitdirectory multiple hidden>
+
+<script type="text/markdown" id="sample-md">{{SAMPLE}}</script>
+{{LAZY}}
+{{VENDOR}}
+<script>
+{{APP}}
+</script>
+</body>
+</html>
