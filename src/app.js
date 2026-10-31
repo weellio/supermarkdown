@@ -1,4 +1,4 @@
-/* Super Markdown - app logic. Plain browser JavaScript, no build step, no network. */
+/* Super Markdown - app logic. Plain browser JavaScript, no build step. Only touches the network for web links the reader opens. */
 (() => {
 'use strict';
 
@@ -25,6 +25,7 @@ const ICONS = {
   code: '<path d="m8 7-5 5 5 5m8-10 5 5-5 5"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14m0 3.5v.01"/>',
   reload: '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>',
+  link: '<path d="M10 14a4 4 0 0 0 6 .4l3-3a4 4 0 0 0-5.7-5.7l-1.2 1.2"/><path d="M14 10a4 4 0 0 0-6-.4l-3 3a4 4 0 0 0 5.7 5.7l1.2-1.2"/>',
   book: '<path d="M4 19.5V5a2 2 0 0 1 2-2h14v15H6.5A2.5 2.5 0 0 0 4 20.5 2.5 2.5 0 0 0 6.5 23H20v-5"/>',
   up: '<path d="m6 15 6-6 6 6"/>',
   down: '<path d="m6 9 6 6 6-6"/>',
@@ -211,7 +212,7 @@ function engine(breaks, math) {
 }
 
 let purifyReady = false;
-function sanitize(html) {
+function sanitize(html, foreign = false) {
   if (!purifyReady) {
     DOMPurify.addHook('afterSanitizeAttributes', node => {
       // keep images from loading until we have resolved their real location
@@ -223,7 +224,7 @@ function sanitize(html) {
     });
     purifyReady = true;
   }
-  return DOMPurify.sanitize(html, { RETURN_DOM_FRAGMENT: true, ADD_ATTR: ['target'], FORBID_TAGS: ['style', 'form', 'button', 'select', 'textarea'] });
+  return DOMPurify.sanitize(html, { RETURN_DOM_FRAGMENT: true, ADD_ATTR: ['target'], FORBID_TAGS: ['style', 'form', 'button', 'select', 'textarea'], FORBID_ATTR: foreign ? ['style', 'class', 'bgcolor', 'color', 'face', 'size'] : [] });
 }
 
 /* front matter: a small, forgiving YAML subset */
@@ -283,6 +284,8 @@ const CODE_EXT = {
   cfg: 'ini', conf: 'ini', xml: 'xml', html: 'xml', htm: 'xml', css: 'css', scss: 'scss', less: 'less', lua: 'lua', r: 'r', swift: 'swift',
   vb: 'vbnet', pl: 'perl', csv: 'plaintext', tsv: 'plaintext', log: 'plaintext', diff: 'diff', patch: 'diff', dockerfile: 'dockerfile',
 };
+const MD_ONLY = /\.(md|markdown|mdown|mkd|mkdn|mdwn)$/i;
+const HOSTED_URL = 'https://weellio.github.io/supermarkdown/SuperMarkdown.html';
 const extOf = name => { const m = /\.([^./\\]+)$/.exec(name); return m ? m[1].toLowerCase() : name.toLowerCase(); };
 
 let docs = [];
@@ -312,7 +315,7 @@ function kindFor(name) {
 
 function upsertDoc(d) {
   const key = normPath(d.path || d.name);
-  let doc = docs.find(x => normPath(x.path || x.name) === key && !x.pasted && !d.pasted);
+  let doc = d.url ? docs.find(x => x.url === d.url) : docs.find(x => !x.url && normPath(x.path || x.name) === key && !x.pasted && !d.pasted);
   if (doc) Object.assign(doc, d);
   else { doc = Object.assign({ id: 'd' + Date.now().toString(36) + (++seq) }, d); docs.push(doc); }
   return doc;
@@ -361,6 +364,130 @@ async function ingest(list, { folder = false } = {}) {
   persistDocs();
 }
 
+/* ---------------- web links ---------------- */
+function parseWebUrl(input) {
+  let s = String(input || '').trim();
+  if (!s) return null;
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(s)) s = 'https://' + s;
+  try { const u = new URL(s); return /^https?:$/.test(u.protocol) ? u : null; } catch { return null; }
+}
+
+// a page that shows a file -> the address of the file itself
+function toRawUrl(u) {
+  const p = u.pathname.split('/').filter(Boolean);
+  const h = u.hostname.toLowerCase();
+  if (h === 'github.com' && (p[2] === 'blob' || p[2] === 'raw') && p.length > 4) return `https://raw.githubusercontent.com/${p[0]}/${p[1]}/${p.slice(3).join('/')}`;
+  if (h === 'gist.github.com' && p.length === 2) return `https://gist.githubusercontent.com/${p[0]}/${p[1]}/raw`;
+  if (h === 'gitlab.com') { const i = p.indexOf('blob'); if (i > 0 && p[i - 1] === '-') { p[i] = 'raw'; return `https://gitlab.com/${p.join('/')}`; } }
+  if (h === 'bitbucket.org' && p[2] === 'src') { p[2] = 'raw'; return `https://bitbucket.org/${p.join('/')}`; }
+  if (h === 'www.dropbox.com' || h === 'dropbox.com') {
+    const q = new URLSearchParams(u.search);
+    q.delete('dl');
+    const qs = q.toString();
+    return `https://dl.dropboxusercontent.com${u.pathname}${qs ? '?' + qs : ''}`;
+  }
+  const clean = new URL(u.href);
+  clean.hash = '';
+  return clean.href;
+}
+
+function nameFromUrl(url) {
+  const u = new URL(url);
+  let seg = u.pathname.split('/').filter(Boolean).pop() || u.hostname;
+  try { seg = decodeURIComponent(seg); } catch { /* keep raw */ }
+  return /\.[a-z0-9]+$/i.test(seg) ? seg : seg + '.md';
+}
+
+function htmlToContent(html) {
+  const page = new DOMParser().parseFromString(html, 'text/html');
+  for (const el of page.querySelectorAll('script, style, noscript, nav, aside, form, body > header, body > footer')) el.remove();
+  const main = page.querySelector('article, main, [role="main"]') || page.body;
+  return { html: main ? main.innerHTML : '', title: (page.title || '').trim(), chars: main ? main.textContent.trim().length : 0 };
+}
+
+let linkSeq = 0;
+function setLinkBusy(busy) {
+  for (const b of $$('[data-act="link-go"], [data-act="welcome-link"]')) b.disabled = busy;
+}
+
+function showBlocked(url) {
+  $('#link-url').value = url;
+  $('#link-open').href = url;
+  $('#link-paste').value = '';
+  $('#link-blocked').hidden = false;
+  if (!$('#link-dlg').open) $('#link-dlg').showModal();
+  $('#link-paste').focus();
+}
+
+async function openUrl(input) {
+  const u = parseWebUrl(input);
+  if (!u) return toast("That doesn't look like a web link.", 'error');
+  const hash = u.hash.slice(1);
+  const url = toRawUrl(u);
+  const mine = ++linkSeq;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 25000);
+  setLinkBusy(true);
+  toast('Opening link...', 'info', 1500);
+  try {
+    let res;
+    try { res = await fetch(url, { credentials: 'omit', referrerPolicy: 'no-referrer', signal: ctrl.signal }); }
+    catch { if (mine === linkSeq) showBlocked(url); return; }
+    if (mine !== linkSeq) return;
+    if (res.status === 404 || res.status === 410) throw new Error('the page was not found');
+    if (!res.ok) return showBlocked(url);
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes.length > 60 * 1024 * 1024) throw new Error('the file is over 60 MB');
+    const text = decode(bytes);
+    if (mine !== linkSeq) return;
+    const finalUrl = res.url || url;
+    let name = nameFromUrl(finalUrl), kind = kindFor(name), body = text;
+    if (/html/i.test(res.headers.get('content-type') || '') || /^\s*<(!doctype html|html)/i.test(text.slice(0, 300))) {
+      const page = htmlToContent(text);
+      if (page.chars < 200) return showBlocked(url);
+      body = page.html;
+      kind = 'html';
+      name = page.title || name;
+    }
+    const doc = upsertDoc({ name, path: name, url: finalUrl, text: body, kind, handle: null, lastModified: Date.now() });
+    if ($('#link-dlg').open) $('#link-dlg').close();
+    openDoc(doc.id);
+    renderFiles();
+    persistDocs();
+    if (hash) setTimeout(() => goToId(hash), 60);
+  } catch (err) {
+    toast(`Couldn't open that link: ${err.message}`, 'error');
+  } finally {
+    clearTimeout(timer);
+    setLinkBusy(false);
+  }
+}
+
+// clipboard -> document. Formatted copies from a web page keep their structure;
+// Markdown copied from an editor stays Markdown even when the editor also offers HTML.
+const HTML_STRUCTURE = /<(h[1-6]|table|ul|ol|pre|blockquote|strong|b)[\s>]/i;
+const MD_SIGNS = /^#{1,6}\s|^```|^\|.*\|\s*$|\*\*\S|\]\(\S/m;
+function openClip(clip) {
+  const plain = clip.getData('text/plain') || '';
+  const html = clip.getData('text/html') || '';
+  if (html && HTML_STRUCTURE.test(html) && !MD_SIGNS.test(plain)) {
+    const page = htmlToContent(html);
+    if (page.chars) {
+      const heading = new DOMParser().parseFromString(page.html, 'text/html').querySelector('h1, h2');
+      const name = heading?.textContent.trim().slice(0, 80) || 'Pasted note';
+      const doc = upsertDoc({ name, path: name, text: page.html, kind: 'html', handle: null, lastModified: Date.now(), pasted: true });
+      openDoc(doc.id);
+      renderFiles();
+      persistDocs();
+      return true;
+    }
+  }
+  if (!plain.trim()) return false;
+  const heading = /^#{1,6}\s+(.+)$/m.exec(plain);
+  openText(heading ? heading[1].trim().slice(0, 80) : 'Pasted note', plain);
+  return true;
+}
+
 function openText(name, text, { unique = true } = {}) {
   const doc = upsertDoc({ name, path: name, text, kind: 'md', handle: null, lastModified: Date.now(), pasted: unique });
   openDoc(doc.id);
@@ -376,6 +503,8 @@ function openDoc(id) {
   closeSearch();
   setSource(false);
   root.classList.remove('no-doc');
+  root.classList.toggle('doc-html', doc.kind === 'html');
+  root.classList.toggle('doc-url', !!doc.url);
   $('#welcome').hidden = true;
   $('#doc').hidden = false;
   renderCurrent();
@@ -426,7 +555,7 @@ function persistDocs() {
   for (const d of [current, ...docs.filter(d => d !== current)].filter(Boolean)) {
     if (d.text.length > budget || keep.length >= 15) continue;
     budget -= d.text.length;
-    keep.push({ id: d.id, name: d.name, path: d.path, text: d.text, kind: d.kind, pasted: !!d.pasted, lastModified: d.lastModified });
+    keep.push({ id: d.id, name: d.name, path: d.path, url: d.url, text: d.text, kind: d.kind, pasted: !!d.pasted, lastModified: d.lastModified });
   }
   while (keep.length && !store.set('docs', keep)) keep.pop();
   if (current) store.set('active', current.id);
@@ -459,7 +588,7 @@ function renderCurrent({ keepScroll = false } = {}) {
   }
   let frag;
   try {
-    frag = sanitize(engine(S.breaks || doc.kind === 'text', S.math && doc.kind !== 'code').parse(src));
+    frag = doc.kind === 'html' ? sanitize(src, true) : sanitize(engine(S.breaks || doc.kind === 'text', S.math && doc.kind !== 'code').parse(src));
   } catch (err) {
     console.error(err);
     toast('Part of this document could not be formatted, so it is shown as plain text.', 'error');
@@ -594,7 +723,18 @@ function enhance(article, doc) {
   for (const a of $$('a[href]', article)) {
     const href = a.getAttribute('href');
     if (/^#/.test(href)) continue;
-    if (/^(https?:|mailto:|tel:|ftp:)/i.test(href)) { a.target = '_blank'; a.rel = 'noopener noreferrer'; continue; }
+    let abs = href;
+    if (doc.url && !/^[a-z][a-z0-9+.-]*:/i.test(href)) {
+      try { abs = new URL(href, doc.url).href; } catch { continue; }
+      a.setAttribute('href', abs);
+    }
+    if (/^https?:/i.test(abs)) {
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      try { if (MD_ONLY.test(new URL(abs).pathname)) a.dataset.url = abs; } catch { /* leave as a plain link */ }
+      continue;
+    }
+    if (/^(mailto:|tel:|ftp:)/i.test(href)) { a.target = '_blank'; a.rel = 'noopener noreferrer'; continue; }
     if (/^[a-z][a-z0-9+.-]*:/i.test(href)) continue;
     const [pathPart, hash = ''] = href.split('#');
     let target = null;
@@ -608,6 +748,10 @@ function enhance(article, doc) {
     const src = img.dataset.src;
     img.loading = 'lazy';
     img.decoding = 'async';
+    if (doc.url && !/^[a-z][a-z0-9+.-]*:/i.test(src)) {
+      try { img.src = new URL(src, doc.url).href; } catch { img.remove(); }
+      continue;
+    }
     if (/^(https?:|data:image\/|blob:)/i.test(src) || src.startsWith('//')) { img.src = src; continue; }
     const file = findAsset(base, src);
     if (file) {
@@ -641,8 +785,9 @@ function enhance(article, doc) {
 function findDoc(path) {
   const want = normPath(path);
   const strip = p => p.replace(/\.(md|markdown|mdx|txt)$/i, '');
-  return docs.find(d => normPath(d.path || d.name) === want)
-    || docs.find(d => strip(normPath(d.path || d.name)) === strip(want))
+  const local = docs.filter(d => !d.url);
+  return local.find(d => normPath(d.path || d.name) === want)
+    || local.find(d => strip(normPath(d.path || d.name)) === strip(want))
     || null;
 }
 function findAsset(base, src) {
@@ -756,13 +901,17 @@ function goToId(id) {
 }
 
 /* ---------------- files list + recent ---------------- */
+function docPlace(d) {
+  if (d.url) { try { return new URL(d.url).hostname; } catch { return ''; } }
+  return dirOf(d.path || '').replace(/\/$/, '');
+}
 function renderFiles() {
   const list = $('#filelist');
   $('#files-count').textContent = docs.length || '';
   $('.side-tabs [data-tab="files"]').hidden = docs.length < 2;
   if (docs.length < 2 && !$('#pane-files').hidden) showTab('outline');
   list.innerHTML = docs.length ? docs.map(d => {
-    const dir = dirOf(d.path || '').replace(/\/$/, '');
+    const dir = docPlace(d);
     return `<div class="file${d === current ? ' active' : ''}"><button data-open="${d.id}" title="${esc(d.path || d.name)}"><span class="fname">${esc(d.name)}</span>${dir ? `<span class="fpath">${esc(dir)}</span>` : ''}</button><button class="icon-btn small" data-close="${d.id}" title="Close" aria-label="Close ${esc(d.name)}">${icon('x')}</button></div>`;
   }).join('') : '<div class="empty">No documents open.</div>';
 }
@@ -783,7 +932,7 @@ function renderRecent() {
   const box = $('#recent');
   box.hidden = !docs.length;
   $('#recent-list').innerHTML = docs.map(d => {
-    const dir = dirOf(d.path || '').replace(/\/$/, '');
+    const dir = docPlace(d);
     return `<button data-open-recent="${d.id}"><span class="rname">${esc(d.name)}</span><span class="rpath">${esc(dir)}</span></button>`;
   }).join('');
 }
@@ -876,7 +1025,8 @@ addEventListener('drop', async e => {
     handle: i.getAsFileSystemHandle ? i.getAsFileSystemHandle().catch(() => null) : null,
   }));
   if (!items.length && dt.files?.length) for (const f of dt.files) grabbed.push({ entry: null, file: f, handle: null });
-  const text = !grabbed.length ? dt.getData('text/plain') : '';
+  const text = !grabbed.length ? (dt.getData('text/uri-list').split('\n').find(l => l && !l.startsWith('#')) || dt.getData('text/plain')) : '';
+  if (/^https?:\/\/\S+$/i.test(text.trim())) return openUrl(text);
   if (text.trim()) return openText('Dropped text', text);
 
   const list = [];
@@ -895,8 +1045,9 @@ addEventListener('paste', e => {
   if (e.target.closest?.('input, textarea, [contenteditable]')) return;
   const files = Array.from(e.clipboardData?.files || []);
   if (files.length) { e.preventDefault(); return ingest(files.map(f => ({ file: f, path: f.name }))); }
-  const text = e.clipboardData?.getData('text/plain') || '';
-  if (text.trim()) { e.preventDefault(); openText('Pasted note', text); }
+  const text = (e.clipboardData?.getData('text/plain') || '').trim();
+  if (/^https?:\/\/\S+$/i.test(text)) { e.preventDefault(); return openUrl(text); }
+  if (e.clipboardData && openClip(e.clipboardData)) e.preventDefault();
 });
 
 /* ---------------- search ---------------- */
@@ -1097,6 +1248,20 @@ const actions = {
     $('#folder-input').click();
   },
   paste: () => { $('#paste-dlg').showModal(); $('#paste-text').focus(); },
+  link: () => {
+    $('#link-blocked').hidden = true;
+    $('#link-url').value = '';
+    $('#link-dlg').showModal();
+    $('#link-url').focus();
+  },
+  'link-go': () => openUrl($('#link-url').value),
+  'welcome-link': () => openUrl($('#welcome-url').value),
+  'share-link': async () => {
+    if (!current?.url) return;
+    const base = /^https?:$/.test(location.protocol) ? location.origin + location.pathname : HOSTED_URL;
+    const ok = await copyText(`${base}?url=${encodeURIComponent(current.url)}`);
+    toast(ok ? 'Link copied. It opens this document, formatted, on any computer.' : 'Copy was blocked by the browser.');
+  },
   'paste-go': () => {
     const text = $('#paste-text').value;
     if (!text.trim()) return toast('Nothing to show yet. Paste some Markdown first.');
@@ -1116,7 +1281,7 @@ const actions = {
   'search-next': () => gotoHit(hitIdx + 1),
   'search-prev': () => gotoHit(hitIdx - 1),
   'search-close': closeSearch,
-  source: () => { if (current) setSource($('#source').hidden); },
+  source: () => { if (current && current.kind !== 'html') setSource($('#source').hidden); },
   'copy-md': async () => { if (current) toast((await copyText(current.text)) ? 'Markdown copied.' : 'Copy was blocked by the browser.'); },
   'copy-code': async (el) => {
     const code = el.closest('.codeblock').querySelector('pre').textContent;
@@ -1130,6 +1295,7 @@ const actions = {
   close: () => closeDoc(),
   reload: async () => {
     if (!current) return;
+    if (current.url) { positions[current.id] = scrollY; return openUrl(current.url); }
     if (!current.handle) return toast('To reload, drop the file here again. (This browser did not give a live link to it.)');
     try { const f = await current.handle.getFile(); current.text = await readText(f); current.lastModified = f.lastModified; renderCurrent({ keepScroll: true }); persistDocs(); toast('Reloaded.'); }
     catch { toast('Could not reload. The file may have moved.', 'error'); }
@@ -1154,6 +1320,7 @@ document.addEventListener('click', e => {
   if (a) {
     const href = a.getAttribute('href');
     if (href.startsWith('#')) { e.preventDefault(); goToId(href.slice(1)); return; }
+    if (a.dataset.url && !e.ctrlKey && !e.metaKey && !e.shiftKey) { e.preventDefault(); openUrl(a.dataset.url); return; }
     if (a.dataset.doc) { e.preventDefault(); openDoc(a.dataset.doc); if (a.dataset.hash) setTimeout(() => goToId(a.dataset.hash), 60); return; }
     if (a.dataset.missing !== undefined) { e.preventDefault(); toast(`"${a.dataset.missing}" is not open. Open its folder to follow links between files.`); return; }
     return;
@@ -1167,6 +1334,13 @@ document.addEventListener('click', e => {
 });
 $('#lightbox').addEventListener('click', () => { $('#lightbox').hidden = true; });
 $('#scrim').addEventListener('click', () => { mobileSide = false; applySidebar(); });
+for (const [input, act] of [['#link-url', 'link-go'], ['#welcome-url', 'welcome-link']]) {
+  $(input).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); actions[act](); } });
+}
+$('#link-paste').addEventListener('paste', e => {
+  e.preventDefault();
+  if (openClip(e.clipboardData)) $('#link-dlg').close();
+});
 $('#paste-text').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) actions['paste-go'](); });
 
 /* reading ruler */
@@ -1204,6 +1378,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.matches?.('th.sortable')) return sortTable(e.target);
   const k = e.key;
   if (k === '?') { e.preventDefault(); return actions.help(); }
+  if (k === 'l' || k === 'L') { e.preventDefault(); return actions.link(); }
   if (k === 't' || k === 'T') { const i = THEMES.findIndex(([id]) => id === S.theme); const next = THEMES[(i + 1) % THEMES.length]; setSetting('theme', next[0]); return toast('Theme: ' + next[1], 'info', 1200); }
   if (k === '+' || k === '=') return setSetting('size', Math.min(30, S.size + 1));
   if (k === '-' || k === '_') return setSetting('size', Math.max(13, S.size - 1));
@@ -1235,6 +1410,9 @@ function boot() {
   renderFiles();
   const active = docs.find(d => d.id === store.get('active', null));
   if (active) openDoc(active.id); else showWelcome();
+  let linked = null;
+  try { linked = new URLSearchParams(location.search).get('url'); } catch { /* no query */ }
+  if (linked) openUrl(linked);
 }
 boot();
 })();

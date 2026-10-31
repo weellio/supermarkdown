@@ -17,7 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "src"
 NM = ROOT / "vendor-src" / "node_modules"
-VERSION = "1.0"
+VERSION = "1.1"
 SENTINEL = ""
 
 VENDOR = [

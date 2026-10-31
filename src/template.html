@@ -12,7 +12,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src * data: blob:; media-src * data: blob:; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src * data: blob:; media-src * data: blob:; font-src data:; connect-src https: http:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="color-scheme" content="light dark">
 <title>Super Markdown</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232563eb'/%3E%3Cpath d='M6 22V10h3l3 4 3-4h3v12h-3v-7l-3 4-3-4v7zm17 0-4-5h3v-7h2v7h3z' fill='white'/%3E%3C/svg%3E">
@@ -39,11 +39,13 @@
 <div id="menu" class="menu pop" hidden role="menu">
   <button data-act="open-file" data-icon="open">Open file&hellip;<kbd>Ctrl O</kbd></button>
   <button data-act="open-folder" data-icon="folder">Open folder&hellip;</button>
+  <button data-act="link" data-icon="link">Open web link&hellip;<kbd>L</kbd></button>
   <button data-act="paste" data-icon="clipboard">Paste Markdown&hellip;</button>
   <hr>
   <button class="needs-doc" data-act="reload" data-icon="reload">Reload from disk</button>
-  <button class="needs-doc" data-act="source" data-icon="code">Show Markdown source<kbd>V</kbd></button>
-  <button class="needs-doc" data-act="copy-md" data-icon="copy">Copy the Markdown</button>
+  <button class="needs-doc needs-url" data-act="share-link" data-icon="link">Copy link to this document</button>
+  <button class="needs-doc needs-md" data-act="source" data-icon="code">Show Markdown source<kbd>V</kbd></button>
+  <button class="needs-doc needs-md" data-act="copy-md" data-icon="copy">Copy the Markdown</button>
   <button class="needs-doc" data-act="print" data-icon="printer">Print / save as PDF<kbd>Ctrl P</kbd></button>
   <button class="needs-doc" data-act="export" data-icon="download">Save as an HTML page</button>
   <button class="needs-doc" data-act="close" data-icon="x">Close this document</button>
@@ -91,6 +93,10 @@
         <button class="btn" data-act="open-folder" data-icon="folder">Open folder</button>
         <button class="btn" data-act="paste" data-icon="clipboard">Paste text</button>
         <button class="btn" data-act="sample" data-icon="book">See a sample</button>
+      </div>
+      <div class="link-row">
+        <input id="welcome-url" class="field" type="url" placeholder="Or paste a web link to a Markdown file" aria-label="Web link" autocomplete="off" spellcheck="false">
+        <button class="btn" data-act="welcome-link">Open link</button>
       </div>
       <p class="hint">Tip: drop a whole folder to show its images and follow links between files.</p>
     </div>
@@ -169,6 +175,7 @@
   <div class="panel-head"><h2>Keyboard shortcuts</h2><button class="icon-btn small" data-act="dlg-close" data-icon="x" aria-label="Close"></button></div>
   <table class="keys">
     <tr><td><kbd>Ctrl</kbd> <kbd>O</kbd></td><td>Open a file</td></tr>
+    <tr><td><kbd>L</kbd></td><td>Open a web link</td></tr>
     <tr><td><kbd>Ctrl</kbd> <kbd>F</kbd> or <kbd>/</kbd></td><td>Search the document</td></tr>
     <tr><td><kbd>[</kbd></td><td>Show / hide the sidebar</td></tr>
     <tr><td><kbd>T</kbd></td><td>Next theme</td></tr>
@@ -184,6 +191,23 @@
   <p class="small">GitHub-style Markdown: tables, task lists, strikethrough, footnotes, <code>==highlights==</code>,
   callouts (<code>&gt; [!NOTE]</code>, <code>[!TIP]</code>, <code>[!WARNING]</code>&hellip;), front matter, code highlighting for 190+ languages{{LAZY_HELP}}.
   Raw HTML is allowed but cleaned, so scripts in a document can never run.</p>
+</dialog>
+
+<dialog id="link-dlg" class="dlg">
+  <div class="panel-head"><h2>Open a web link</h2><button class="icon-btn small" data-act="dlg-close" data-icon="x" aria-label="Close"></button></div>
+  <div class="link-row">
+    <input id="link-url" class="field" type="url" placeholder="https://..." aria-label="Web link" autocomplete="off" spellcheck="false">
+    <button class="btn primary" data-act="link-go">Open</button>
+  </div>
+  <div id="link-blocked" hidden>
+    <h3>This site won't let other pages read it. Copy it instead:</h3>
+    <ol class="link-steps">
+      <li><a id="link-open" class="btn small" target="_blank" rel="noopener noreferrer">Open the page</a> Sign in if it asks.</li>
+      <li>Click inside the document, then press <kbd>Ctrl</kbd> <kbd>A</kbd> and <kbd>Ctrl</kbd> <kbd>C</kbd>.</li>
+      <li>Come back and press <kbd>Ctrl</kbd> <kbd>V</kbd> in this box:</li>
+    </ol>
+    <textarea id="link-paste" class="field" placeholder="Paste here" aria-label="Paste the copied document" spellcheck="false"></textarea>
+  </div>
 </dialog>
 
 <dialog id="paste-dlg" class="dlg wide">

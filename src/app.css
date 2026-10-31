@@ -118,7 +118,7 @@ kbd { font: 600 11px/1 var(--font-mono); padding: 3px 5px; border: 1px solid var
 .chip.live { color: var(--c-tip); background: color-mix(in srgb, var(--c-tip) 14%, transparent); }
 .chip.live::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: currentColor; vertical-align: 1px; animation: pulse 2s infinite; }
 @keyframes pulse { 50% { opacity: .35; } }
-html.no-doc .needs-doc { display: none; }
+html.no-doc .needs-doc, html:not(.doc-url) .needs-url, html.doc-html .needs-md { display: none; }
 
 .pop { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
 .menu { position: fixed; top: calc(var(--topbar) - 4px); right: 8px; z-index: 60; width: 270px; padding: 6px; }
@@ -183,6 +183,16 @@ mark.hit.current { background: var(--accent); color: var(--on-accent); }
 #recent-list button:hover { border-color: var(--accent); }
 #recent-list .rname { font-weight: 600; }
 #recent-list .rpath { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+
+/* web links */
+.link-row { display: flex; gap: 8px; }
+.link-row .field { flex: 1; min-width: 0; height: 40px; }
+.drop-card .link-row { max-width: 520px; margin: 22px auto 0; }
+.link-steps { margin: 0 0 12px; padding-left: 22px; font-size: 14px; line-height: 1.5; }
+.link-steps li { margin: 8px 0; }
+.link-steps .btn { text-decoration: none; margin-right: 6px; }
+#link-paste { height: 96px; padding: 10px 12px; resize: vertical; }
+.btn:disabled { opacity: .55; cursor: progress; }
 
 /* settings panel */
 .panel { position: fixed; top: calc(var(--topbar) + 8px); right: 8px; bottom: 8px; z-index: 60; width: min(360px, calc(100vw - 16px)); overflow: auto; padding: 0 18px 18px; }

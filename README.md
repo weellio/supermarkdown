@@ -15,6 +15,9 @@ A Markdown reader in **one HTML file**. Nothing to install. Works offline.
 |---|---|
 | Open a file | Drag it in, or press `Ctrl+O` |
 | See images + follow links between files | Drop the whole **folder** |
+| Open a Markdown file from the web | Paste its link anywhere on the page, or press `L` |
+| Open a document from a sign-in site (claude.ai) | Paste its link, then follow the copy-and-paste steps |
+| Send someone a formatted link | `⋯` menu → Copy link to this document |
 | Read text from the clipboard | Press `Ctrl+V` anywhere on the page |
 | Change theme, font, spacing | Sliders icon (top right) |
 | Print or make a PDF | `⋯` menu → Print / save as PDF |
@@ -29,7 +32,9 @@ A Markdown reader in **one HTML file**. Nothing to install. Works offline.
 
 ## Safe for locked-down machines
 
-- No network calls (a Content-Security-Policy blocks them). Only images a document links to on the web are loaded.
+- Nothing is ever uploaded. It only goes online for a web link you open, images a document links to, and files linked from a web document.
+- Links open directly from sites that allow it (GitHub, Gist, Bitbucket, GitHub Pages). Sites that don't allow it, or need a sign-in, use copy and paste.
+- Web links ask the site anonymously: your sign-ins are never sent.
 - Scripts inside a Markdown file never run (DOMPurify cleans every page).
 - Open documents and settings are kept in the browser's local storage. Turn off **Remember open documents** in the options to stop that.
 - Live reload (the green **Live** chip) works in Edge/Chrome when a file is dragged in or opened with `Ctrl+O`.
