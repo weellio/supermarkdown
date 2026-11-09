@@ -705,8 +705,20 @@ function enhance(article, doc) {
     wrap.className = 'table-wrap';
     table.replaceWith(wrap);
     wrap.append(table);
+    // a cell holding only [ ] or [x] is a tick box, like a task list item
+    for (const td of $$('td', table)) {
+      const m = /^\[([ xX]?)\]$/.exec(td.textContent.trim());
+      if (!m || td.children.length) continue;
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = m[1] !== '' && m[1] !== ' ';
+      box.disabled = true;
+      box.setAttribute('aria-label', box.checked ? 'Done' : 'Not done');
+      td.replaceChildren(box);
+      td.classList.add('check');
+    }
     const rows = table.tBodies[0]?.rows.length || 0;
-    if (rows > 1) for (const th of $$('thead th', table)) { th.classList.add('sortable'); th.tabIndex = 0; th.title = 'Sort by this column'; }
+    if (rows > 1) for (const th of $$('thead th', table)) { if (!th.textContent.trim()) continue; th.classList.add('sortable'); th.tabIndex = 0; th.title = 'Sort by this column'; }
   }
 
   // task lists
@@ -1200,7 +1212,7 @@ function sortTable(th) {
   const dir = th.getAttribute('aria-sort') === 'ascending' ? 'descending' : 'ascending';
   for (const other of $$('th', table)) other.removeAttribute('aria-sort');
   th.setAttribute('aria-sort', dir);
-  const val = r => (r.cells[col]?.textContent || '').trim();
+  const val = r => { const c = r.cells[col]; const box = c?.querySelector('input[type=checkbox]'); return box ? (box.checked ? '1' : '0') : (c?.textContent || '').trim(); };
   const num = s => { const n = parseFloat(s.replace(/[$€£,%\s]/g, '')); return /^[-+]?[$€£]?[\d,.]+%?$/.test(s.replace(/\s/g, '')) && !isNaN(n) ? n : null; };
   const rows = Array.from(body.rows);
   rows.sort((a, b) => {

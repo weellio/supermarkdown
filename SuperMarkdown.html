@@ -36,6 +36,7 @@
   --fs: 18px; --lh: 1.7; --ls: 0em; --ws: 0em;
   --measure: 72ch;
   --topbar: 52px; --side: 290px;
+  --side-now: var(--side);  /* width the sidebar takes from the page right now */
   --radius: 12px;
 }
 html[data-font="sans"]  { --font-read: var(--font-ui); }
@@ -184,6 +185,7 @@ html.side-off #sidebar, html.no-doc #sidebar { transform: translateX(-100%); vis
 /* main */
 main { padding: calc(var(--topbar) + 36px) 28px 30vh; margin-left: var(--side); transition: margin-left .2s ease; }
 html.side-off main, html.no-doc main { margin-left: 0; }
+html.side-off, html.no-doc, body.export { --side-now: 0px; }
 
 /* search */
 #searchbar { position: fixed; top: calc(var(--topbar) + 10px); right: 16px; z-index: 35; display: flex; align-items: center; gap: 4px; padding: 5px 5px 5px 12px; width: min(420px, calc(100vw - 32px)); }
@@ -348,13 +350,16 @@ html.code-wrap .md .codeblock pre { white-space: pre-wrap; word-break: break-wor
 .hljs-emphasis { font-style: italic; } .hljs-strong { font-weight: 700; }
 
 /* tables */
-.md .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 11px; background: var(--surface); }
+.md .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 11px; background: var(--surface);
+  width: max-content; min-width: 100%; max-width: calc(100vw - var(--side-now) - 72px); margin-left: 50%; transform: translateX(-50%); }
 .md table { border-collapse: collapse; width: 100%; font-size: .9em; line-height: 1.5; font-variant-numeric: tabular-nums; }
 .md th[align="right"], .md td[align="right"] { text-align: right; }
 .md th[align="center"], .md td[align="center"] { text-align: center; }
 .md th, .md td { padding: .6em .9em; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
 .md td + td, .md th + th { border-left: 1px solid var(--border); }
-.md th { background: var(--surface-2); font-weight: 700; color: var(--text-strong); white-space: nowrap; }
+.md th { background: var(--surface-2); font-weight: 700; color: var(--text-strong); }
+.md td.check { width: 1%; text-align: center; }
+.md td.check input { width: 1.05em; height: 1.05em; margin: .25em 0 0; accent-color: var(--accent); }
 .md tbody tr:last-child td { border-bottom: 0; }
 .md tbody tr:nth-child(even) { background: color-mix(in srgb, var(--surface-2) 55%, transparent); }
 .md tbody tr:hover { background: var(--accent-soft); }
@@ -426,6 +431,7 @@ body.export main { margin-left: 0; padding-top: 48px; }
 /* ============ narrow screens ============ */
 @media (max-width: 900px) {
   main { margin-left: 0 !important; padding-left: 16px; padding-right: 16px; }
+  :root, html.side-off { --side-now: 0px; }
   #sidebar { box-shadow: var(--shadow); width: min(var(--side), 86vw); }
   .stats { display: none; }
 }
@@ -450,6 +456,7 @@ body.export main { margin-left: 0; padding-top: 48px; }
   .topbar, #sidebar, #scrim, #progress, #searchbar, .menu, .panel, #ruler, #toasts, #welcome, #source, .code-head .icon-btn { display: none !important; }
   main { margin: 0 !important; padding: 0 !important; }
   .md { max-width: none; }
+  .md .table-wrap { width: auto; max-width: 100%; margin-left: 0; transform: none; }
   .md .codeblock pre, html.code-wrap .md .codeblock pre { white-space: pre-wrap; word-break: break-word; }
   .md h1, .md h2, .md h3, .md h4 { break-after: avoid; }
   .md .codeblock, .md .callout, .md table, .md img, .md .mermaid-block { break-inside: avoid; }
@@ -8670,8 +8677,20 @@ function enhance(article, doc) {
     wrap.className = 'table-wrap';
     table.replaceWith(wrap);
     wrap.append(table);
+    // a cell holding only [ ] or [x] is a tick box, like a task list item
+    for (const td of $$('td', table)) {
+      const m = /^\[([ xX]?)\]$/.exec(td.textContent.trim());
+      if (!m || td.children.length) continue;
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = m[1] !== '' && m[1] !== ' ';
+      box.disabled = true;
+      box.setAttribute('aria-label', box.checked ? 'Done' : 'Not done');
+      td.replaceChildren(box);
+      td.classList.add('check');
+    }
     const rows = table.tBodies[0]?.rows.length || 0;
-    if (rows > 1) for (const th of $$('thead th', table)) { th.classList.add('sortable'); th.tabIndex = 0; th.title = 'Sort by this column'; }
+    if (rows > 1) for (const th of $$('thead th', table)) { if (!th.textContent.trim()) continue; th.classList.add('sortable'); th.tabIndex = 0; th.title = 'Sort by this column'; }
   }
 
   // task lists
@@ -9165,7 +9184,7 @@ function sortTable(th) {
   const dir = th.getAttribute('aria-sort') === 'ascending' ? 'descending' : 'ascending';
   for (const other of $$('th', table)) other.removeAttribute('aria-sort');
   th.setAttribute('aria-sort', dir);
-  const val = r => (r.cells[col]?.textContent || '').trim();
+  const val = r => { const c = r.cells[col]; const box = c?.querySelector('input[type=checkbox]'); return box ? (box.checked ? '1' : '0') : (c?.textContent || '').trim(); };
   const num = s => { const n = parseFloat(s.replace(/[$€£,%\s]/g, '')); return /^[-+]?[$€£]?[\d,.]+%?$/.test(s.replace(/\s/g, '')) && !isNaN(n) ? n : null; };
   const rows = Array.from(body.rows);
   rows.sort((a, b) => {
