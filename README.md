@@ -3,7 +3,7 @@
 A Markdown reader in **one HTML file**. Nothing to install. Works offline.
 
 - **Try it online:** <https://weellio.github.io/supermarkdown/>
-- **Download:** [SuperMarkdown.html](https://github.com/weellio/supermarkdown/raw/main/SuperMarkdown.html) (right-click â†’ Save link as)
+- **Download:** [SuperMarkdown.html](https://github.com/weellio/supermarkdown/raw/main/SuperMarkdown.html) (right-click → Save link as)
 
 ## Use it
 
@@ -11,17 +11,17 @@ A Markdown reader in **one HTML file**. Nothing to install. Works offline.
 2. Double-click it to open it in Edge, Chrome or Firefox.
 3. Drag a `.md` file onto the page.
 
-| Want toâ€¦ | Do this |
+| Want to… | Do this |
 |---|---|
 | Open a file | Drag it in, or press `Ctrl+O` |
 | See images + follow links between files | Drop the whole **folder** |
 | Open a Markdown file from the web | Paste its link anywhere on the page, or press `L` |
 | Open a document from a sign-in site (claude.ai) | Paste its link, then follow the copy-and-paste steps |
-| Send someone a formatted link | `â‹¯` menu â†’ Copy link to this document |
+| Send someone a formatted link | `⋯` menu → Copy link to this document |
 | Read text from the clipboard | Press `Ctrl+V` anywhere on the page |
 | Change theme, font, spacing | Sliders icon (top right) |
-| Print or make a PDF | `â‹¯` menu â†’ Print / save as PDF |
-| Send a formatted copy | `â‹¯` menu â†’ Save as an HTML page |
+| Print or make a PDF | `⋯` menu → Print / save as PDF |
+| Send a formatted copy | `⋯` menu → Save as an HTML page |
 
 ## Two versions
 
