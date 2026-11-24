@@ -23,6 +23,24 @@ A Markdown reader in **one HTML file**. Nothing to install. Works offline.
 | Print or make a PDF | `⋯` menu → Print / save as PDF |
 | Send a formatted copy | `⋯` menu → Save as an HTML page |
 
+## Windows: double-click .md files
+
+1. Download [SuperMarkdown-Windows.zip](https://github.com/weellio/supermarkdown/releases/latest/download/SuperMarkdown-Windows.zip) and unzip it.
+2. Double-click **Install Super Markdown.cmd**. No admin rights needed.
+3. If Windows asks "How do you want to open this file?", pick **Super Markdown**, tick **Always use this app**, click **OK**.
+
+| You get | Where |
+|---|---|
+| Double-click opens `.md`, `.markdown`, `.mdx` and friends | Anywhere in File Explorer |
+| **Open with Super Markdown** | Right-click any Markdown or `.txt` file (Windows 11: under *Show more options*) |
+| **Super Markdown** | Start menu |
+| Uninstall | Settings → Apps, or **Uninstall Super Markdown.cmd** |
+
+- Installs to `%LOCALAPPDATA%\Programs\SuperMarkdown`, for your user only. Run the installer again to update.
+- Pictures next to the file show up. To see a changed file, double-click it again.
+- Uninstalling puts every file type back the way it was.
+- If Windows shows a security warning for the `.cmd` file, choose **Run**: it came from the internet.
+
 ## Two versions
 
 | File | Size | Has |

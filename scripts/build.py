@@ -12,12 +12,13 @@ import base64
 import json
 import re
 import sys
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "src"
 NM = ROOT / "vendor-src" / "node_modules"
-VERSION = "1.1"
+VERSION = "1.2"
 SENTINEL = ""
 
 VENDOR = [
@@ -135,6 +136,30 @@ def main():
         out.write_text(html, encoding="utf-8", newline="\n")
         print(f"{name}: {out.stat().st_size / 1024 / 1024:.2f} MB")
     print("bundled:", ", ".join(f"{k} {v}" for k, v in versions.items()))
+    build_windows_zip()
+
+
+def build_windows_zip():
+    """dist/SuperMarkdown-Windows.zip: double-click installer + launcher + the full build."""
+    win = ROOT / "windows"
+    out = ROOT / "dist" / "SuperMarkdown-Windows.zip"
+    out.parent.mkdir(exist_ok=True)
+    top = "SuperMarkdown-Windows/"
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+        for name in ["Install Super Markdown.cmd", "Uninstall Super Markdown.cmd"]:
+            # cmd.exe wants CRLF
+            z.writestr(top + name, read(win / name).replace("\r\n", "\n").replace("\n", "\r\n"))
+        for name in ["install.ps1", "open.ps1", "uninstall.ps1"]:
+            text = read(win / name).replace("{{VERSION}}", VERSION)
+            # Windows PowerShell 5.1 reads BOM-less scripts as ANSI: keep them plain ASCII
+            bad = [c for c in text if ord(c) > 127]
+            if bad:
+                sys.exit(f"{name} has non-ASCII characters: {set(bad)}")
+            z.writestr(top + "files/" + name, text.replace("\r\n", "\n").replace("\n", "\r\n"))
+        z.write(win / "supermarkdown.ico", top + "files/supermarkdown.ico")
+        z.write(ROOT / "SuperMarkdown.html", top + "files/SuperMarkdown.html")
+        z.write(SRC / "sample.md", top + "files/Welcome.md")
+    print(f"{out.name}: {out.stat().st_size / 1024 / 1024:.2f} MB")
 
 
 if __name__ == "__main__":

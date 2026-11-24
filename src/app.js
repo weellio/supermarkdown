@@ -286,6 +286,7 @@ const CODE_EXT = {
 };
 const MD_ONLY = /\.(md|markdown|mdown|mkd|mkdn|mdwn)$/i;
 const HOSTED_URL = 'https://weellio.github.io/supermarkdown/SuperMarkdown.html';
+const WINDOWS_INSTALLER = 'https://github.com/weellio/supermarkdown/releases/latest/download/SuperMarkdown-Windows.zip';
 const extOf = name => { const m = /\.([^./\\]+)$/.exec(name); return m ? m[1].toLowerCase() : name.toLowerCase(); };
 
 let docs = [];
@@ -555,7 +556,7 @@ function persistDocs() {
   for (const d of [current, ...docs.filter(d => d !== current)].filter(Boolean)) {
     if (d.text.length > budget || keep.length >= 15) continue;
     budget -= d.text.length;
-    keep.push({ id: d.id, name: d.name, path: d.path, url: d.url, text: d.text, kind: d.kind, pasted: !!d.pasted, lastModified: d.lastModified });
+    keep.push({ id: d.id, name: d.name, path: d.path, url: d.url, fileBase: d.fileBase, text: d.text, kind: d.kind, pasted: !!d.pasted, lastModified: d.lastModified });
   }
   while (keep.length && !store.set('docs', keep)) keep.pop();
   if (current) store.set('active', current.id);
@@ -760,8 +761,8 @@ function enhance(article, doc) {
     const src = img.dataset.src;
     img.loading = 'lazy';
     img.decoding = 'async';
-    if (doc.url && !/^[a-z][a-z0-9+.-]*:/i.test(src)) {
-      try { img.src = new URL(src, doc.url).href; } catch { img.remove(); }
+    if ((doc.url || doc.fileBase) && !/^[a-z][a-z0-9+.-]*:/i.test(src)) {
+      try { img.src = new URL(src, doc.url || doc.fileBase).href; } catch { img.remove(); }
       continue;
     }
     if (/^(https?:|data:image\/|blob:)/i.test(src) || src.startsWith('//')) { img.src = src; continue; }
@@ -915,7 +916,7 @@ function goToId(id) {
 /* ---------------- files list + recent ---------------- */
 function docPlace(d) {
   if (d.url) { try { return new URL(d.url).hostname; } catch { return ''; } }
-  return dirOf(d.path || '').replace(/\/$/, '');
+  return dirOf(d.path || '').replace(/[\\/]$/, '');
 }
 function renderFiles() {
   const list = $('#filelist');
@@ -1282,6 +1283,7 @@ const actions = {
     $('#paste-text').value = '';
     $('#paste-name').value = '';
   },
+  install: () => window.open(WINDOWS_INSTALLER, '_blank', 'noopener'),
   sample: () => openText('Sample - what Super Markdown can show.md', $('#sample-md').textContent.replace(/</g, '<'), { unique: false }),
   help: () => $('#help-dlg').showModal(),
   'dlg-close': (el) => el.closest('dialog').close(),
@@ -1308,6 +1310,7 @@ const actions = {
   reload: async () => {
     if (!current) return;
     if (current.url) { positions[current.id] = scrollY; return openUrl(current.url); }
+    if (current.fileBase) return toast('To reload, double-click the file again.');
     if (!current.handle) return toast('To reload, drop the file here again. (This browser did not give a live link to it.)');
     try { const f = await current.handle.getFile(); current.text = await readText(f); current.lastModified = f.lastModified; renderCurrent({ keepScroll: true }); persistDocs(); toast('Reloaded.'); }
     catch { toast('Could not reload. The file may have moved.', 'error'); }
@@ -1408,6 +1411,30 @@ document.addEventListener('keydown', e => {
   }
 });
 
+/* a file handed over by the Windows launcher (windows/open.ps1) */
+function readLaunchedFile() {
+  const el = document.getElementById('boot-doc');
+  if (!el) return null;
+  const { enc, name, path, base } = el.dataset;
+  const raw = el.textContent;
+  el.remove();
+  try {
+    let text;
+    if (enc === 'base64') {
+      const bin = atob(raw.trim());
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      text = decode(bytes);
+    } else {
+      text = raw.replace(/<\uE000/g, '<');
+    }
+    return upsertDoc({ name, path, fileBase: base, text, kind: kindFor(name), handle: null, lastModified: Date.now() });
+  } catch (err) {
+    toast(`Couldn't open ${name}: ${err.message}`, 'error');
+    return null;
+  }
+}
+
 /* ---------------- start ---------------- */
 function boot() {
   root.classList.add('no-doc');
@@ -1420,8 +1447,11 @@ function boot() {
   const saved = S.remember ? store.get('docs', []) : [];
   if (Array.isArray(saved)) for (const d of saved) if (d && typeof d.text === 'string' && d.id) docs.push(Object.assign({ handle: null }, d));
   renderFiles();
-  const active = docs.find(d => d.id === store.get('active', null));
+  root.classList.toggle('is-windows', /Windows/i.test(navigator.userAgent));
+  const launched = readLaunchedFile();
+  const active = launched || docs.find(d => d.id === store.get('active', null));
   if (active) openDoc(active.id); else showWelcome();
+  if (launched) persistDocs();
   let linked = null;
   try { linked = new URLSearchParams(location.search).get('url'); } catch { /* no query */ }
   if (linked) openUrl(linked);

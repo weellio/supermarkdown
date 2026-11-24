@@ -119,7 +119,7 @@ kbd { font: 600 11px/1 var(--font-mono); padding: 3px 5px; border: 1px solid var
 .chip.live { color: var(--c-tip); background: color-mix(in srgb, var(--c-tip) 14%, transparent); }
 .chip.live::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: currentColor; vertical-align: 1px; animation: pulse 2s infinite; }
 @keyframes pulse { 50% { opacity: .35; } }
-html.no-doc .needs-doc, html:not(.doc-url) .needs-url, html.doc-html .needs-md { display: none; }
+html.no-doc .needs-doc, html:not(.doc-url) .needs-url, html.doc-html .needs-md, html:not(.is-windows) .win-only { display: none; }
 
 .pop { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
 .menu { position: fixed; top: calc(var(--topbar) - 4px); right: 8px; z-index: 60; width: 270px; padding: 6px; }

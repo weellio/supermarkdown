@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  Super Markdown 1.1 (full build) - a single-file, offline Markdown reader.
+  Super Markdown 1.2 (full build) - a single-file, offline Markdown reader.
   Drop a .md file (or a whole folder) onto this page. Nothing is uploaded; nothing is installed.
 
   Bundled third-party software (all inlined below, unmodified apart from HTML-safe escaping):
@@ -12,7 +12,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src * data: blob:; media-src * data: blob:; font-src data:; connect-src https: http:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src * data: blob: file:; media-src * data: blob:; font-src data:; connect-src https: http:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="color-scheme" content="light dark">
 <title>Super Markdown</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232563eb'/%3E%3Cpath d='M6 22V10h3l3 4 3-4h3v12h-3v-7l-3 4-3-4v7zm17 0-4-5h3v-7h2v7h3z' fill='white'/%3E%3C/svg%3E">
@@ -145,7 +145,7 @@ kbd { font: 600 11px/1 var(--font-mono); padding: 3px 5px; border: 1px solid var
 .chip.live { color: var(--c-tip); background: color-mix(in srgb, var(--c-tip) 14%, transparent); }
 .chip.live::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: currentColor; vertical-align: 1px; animation: pulse 2s infinite; }
 @keyframes pulse { 50% { opacity: .35; } }
-html.no-doc .needs-doc, html:not(.doc-url) .needs-url, html.doc-html .needs-md { display: none; }
+html.no-doc .needs-doc, html:not(.doc-url) .needs-url, html.doc-html .needs-md, html:not(.is-windows) .win-only { display: none; }
 
 .pop { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
 .menu { position: fixed; top: calc(var(--topbar) - 4px); right: 8px; z-index: 60; width: 270px; padding: 6px; }
@@ -500,6 +500,7 @@ body.export main { margin-left: 0; padding-top: 48px; }
   <button class="needs-doc" data-act="close" data-icon="x">Close this document</button>
   <hr>
   <button data-act="sample" data-icon="book">Open the sample document</button>
+  <button class="win-only" data-act="install" data-icon="download">Get the Windows installer</button>
   <button data-act="help" data-icon="help">Keyboard shortcuts<kbd>?</kbd></button>
 </div>
 
@@ -616,7 +617,7 @@ body.export main { margin-left: 0; padding-top: 48px; }
   </div>
   <div class="panel-foot">
     <button class="btn small" data-act="reset">Reset to defaults</button>
-    <span class="muted small">Super Markdown 1.1</span>
+    <span class="muted small">Super Markdown 1.2</span>
   </div>
 </div>
 
@@ -8258,6 +8259,7 @@ const CODE_EXT = {
 };
 const MD_ONLY = /\.(md|markdown|mdown|mkd|mkdn|mdwn)$/i;
 const HOSTED_URL = 'https://weellio.github.io/supermarkdown/SuperMarkdown.html';
+const WINDOWS_INSTALLER = 'https://github.com/weellio/supermarkdown/releases/latest/download/SuperMarkdown-Windows.zip';
 const extOf = name => { const m = /\.([^./\\]+)$/.exec(name); return m ? m[1].toLowerCase() : name.toLowerCase(); };
 
 let docs = [];
@@ -8527,7 +8529,7 @@ function persistDocs() {
   for (const d of [current, ...docs.filter(d => d !== current)].filter(Boolean)) {
     if (d.text.length > budget || keep.length >= 15) continue;
     budget -= d.text.length;
-    keep.push({ id: d.id, name: d.name, path: d.path, url: d.url, text: d.text, kind: d.kind, pasted: !!d.pasted, lastModified: d.lastModified });
+    keep.push({ id: d.id, name: d.name, path: d.path, url: d.url, fileBase: d.fileBase, text: d.text, kind: d.kind, pasted: !!d.pasted, lastModified: d.lastModified });
   }
   while (keep.length && !store.set('docs', keep)) keep.pop();
   if (current) store.set('active', current.id);
@@ -8732,8 +8734,8 @@ function enhance(article, doc) {
     const src = img.dataset.src;
     img.loading = 'lazy';
     img.decoding = 'async';
-    if (doc.url && !/^[a-z][a-z0-9+.-]*:/i.test(src)) {
-      try { img.src = new URL(src, doc.url).href; } catch { img.remove(); }
+    if ((doc.url || doc.fileBase) && !/^[a-z][a-z0-9+.-]*:/i.test(src)) {
+      try { img.src = new URL(src, doc.url || doc.fileBase).href; } catch { img.remove(); }
       continue;
     }
     if (/^(https?:|data:image\/|blob:)/i.test(src) || src.startsWith('//')) { img.src = src; continue; }
@@ -8887,7 +8889,7 @@ function goToId(id) {
 /* ---------------- files list + recent ---------------- */
 function docPlace(d) {
   if (d.url) { try { return new URL(d.url).hostname; } catch { return ''; } }
-  return dirOf(d.path || '').replace(/\/$/, '');
+  return dirOf(d.path || '').replace(/[\\/]$/, '');
 }
 function renderFiles() {
   const list = $('#filelist');
@@ -9254,6 +9256,7 @@ const actions = {
     $('#paste-text').value = '';
     $('#paste-name').value = '';
   },
+  install: () => window.open(WINDOWS_INSTALLER, '_blank', 'noopener'),
   sample: () => openText('Sample - what Super Markdown can show.md', $('#sample-md').textContent.replace(/</g, '<'), { unique: false }),
   help: () => $('#help-dlg').showModal(),
   'dlg-close': (el) => el.closest('dialog').close(),
@@ -9280,6 +9283,7 @@ const actions = {
   reload: async () => {
     if (!current) return;
     if (current.url) { positions[current.id] = scrollY; return openUrl(current.url); }
+    if (current.fileBase) return toast('To reload, double-click the file again.');
     if (!current.handle) return toast('To reload, drop the file here again. (This browser did not give a live link to it.)');
     try { const f = await current.handle.getFile(); current.text = await readText(f); current.lastModified = f.lastModified; renderCurrent({ keepScroll: true }); persistDocs(); toast('Reloaded.'); }
     catch { toast('Could not reload. The file may have moved.', 'error'); }
@@ -9380,6 +9384,30 @@ document.addEventListener('keydown', e => {
   }
 });
 
+/* a file handed over by the Windows launcher (windows/open.ps1) */
+function readLaunchedFile() {
+  const el = document.getElementById('boot-doc');
+  if (!el) return null;
+  const { enc, name, path, base } = el.dataset;
+  const raw = el.textContent;
+  el.remove();
+  try {
+    let text;
+    if (enc === 'base64') {
+      const bin = atob(raw.trim());
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      text = decode(bytes);
+    } else {
+      text = raw.replace(/<\uE000/g, '<');
+    }
+    return upsertDoc({ name, path, fileBase: base, text, kind: kindFor(name), handle: null, lastModified: Date.now() });
+  } catch (err) {
+    toast(`Couldn't open ${name}: ${err.message}`, 'error');
+    return null;
+  }
+}
+
 /* ---------------- start ---------------- */
 function boot() {
   root.classList.add('no-doc');
@@ -9392,8 +9420,11 @@ function boot() {
   const saved = S.remember ? store.get('docs', []) : [];
   if (Array.isArray(saved)) for (const d of saved) if (d && typeof d.text === 'string' && d.id) docs.push(Object.assign({ handle: null }, d));
   renderFiles();
-  const active = docs.find(d => d.id === store.get('active', null));
+  root.classList.toggle('is-windows', /Windows/i.test(navigator.userAgent));
+  const launched = readLaunchedFile();
+  const active = launched || docs.find(d => d.id === store.get('active', null));
   if (active) openDoc(active.id); else showWelcome();
+  if (launched) persistDocs();
   let linked = null;
   try { linked = new URLSearchParams(location.search).get('url'); } catch { /* no query */ }
   if (linked) openUrl(linked);
